@@ -10,7 +10,7 @@ def load_questions():
     df = df.dropna(subset=["question"])
     for col in ["1", "2", "3", "4", "5"]:
         df[col] = df[col].fillna("").str.replace(r"\s+", " ", regex=True).str.strip()
-    return df.reset_index(drop=True)[:3]
+    return df.reset_index(drop=True)
 
 
 @st.cache_data
@@ -20,12 +20,35 @@ def load_benchmark():
         df[col] = df[col].str.rstrip("%").astype(float)
     return df
 
-
+@st.cache_data
 def load_sectors():
     df = pd.read_csv("benchmark.csv", sep=";", quotechar='"', on_bad_lines="skip")
     sectors = list(df.columns)[1:]
     sectors.append("Other")
     return sectors
+
+
+def matrix(user_cat_means, sector, bench_cat_means=None):
+    data = {"Your Score": {cat: f"{v}%" for cat, v in user_cat_means.items()}}
+    if bench_cat_means:
+        data[f"{sector} Benchmark"] = {cat: f"{bench_cat_means.get(cat, 'N/A')}%" for cat in user_cat_means}
+    st.table(pd.DataFrame(data))
+
+
+def radar_graph(topic_scores, sector, bench_topic=None):
+    topics = list(topic_scores.keys())
+    user_vals = [topic_scores[t] for t in topics]
+    topics_c = topics + [topics[0]]
+    user_c = user_vals + [user_vals[0]]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(r=user_c, theta=topics_c, name="Your Score", fill="toself"))
+    if bench_topic:
+        bench_vals = [bench_topic.get(t, 0) for t in topics]
+        bench_c = bench_vals + [bench_vals[0]]
+        fig.add_trace(go.Scatterpolar(r=bench_c, theta=topics_c, name=sector, fill="toself"))
+    fig.update_layout(polar=dict(radialaxis=dict(range=[0, 100])), showlegend=True)
+    st.plotly_chart(fig)
 
 
 def main():
@@ -38,6 +61,8 @@ def main():
     # Initialisation
     if "sector" not in st.session_state:
         st.session_state.sector = None
+    if "sector" not in st.session_state:
+        st.session_state.sector_other = None
     if "company" not in st.session_state:
         st.session_state.company = None
     if "current" not in st.session_state:
@@ -55,8 +80,8 @@ def main():
             custom_sector = st.text_input("Please specify your sector")
         if st.button("Start", disabled=not company or (sector == "Other" and not custom_sector)):
             st.session_state.company = company
-            st.session_state.sector = custom_sector if sector == "Other" else sector
-            st.session_state.is_other = sector == "Other"
+            st.session_state.sector =  sector
+            st.session_state.sector_other = custom_sector if sector=='Other' else sector
             st.rerun()
         return
 
@@ -104,42 +129,17 @@ def main():
         bench = load_benchmark()
         bench_topic = dict(zip(bench["Topic"], bench[sector]))
         topic_to_cat = dict(zip(df["topic"], df["category"]))
-
-        # Moyenne benchmark par catégorie (uniquement pour les topics répondus)
         bench_cat = {}
         for topic in topic_scores:
             cat = topic_to_cat[topic]
             bench_cat.setdefault(cat, []).append(bench_topic.get(topic, 0))
         bench_cat_means = {cat: round(sum(v) / len(v)) for cat, v in bench_cat.items()}
 
-        # Tableau comparatif
-        result_df = pd.DataFrame({
-            "Your Score": {cat: f"{v}%" for cat, v in user_cat_means.items()},
-            f"{sector} Benchmark": {cat: f"{bench_cat_means.get(cat, 'N/A')}%" for cat in user_cat_means},
-        })
-        st.table(result_df)
-
-        # Radar chart par topic
-        topics = list(topic_scores.keys())
-        user_vals = [topic_scores[t] for t in topics]
-        bench_vals = [bench_topic.get(t, 0) for t in topics]
-
-        # Fermeture du radar
-        topics_c = topics + [topics[0]]
-        user_c = user_vals + [user_vals[0]]
-        bench_c = bench_vals + [bench_vals[0]]
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=user_c, theta=topics_c, name="Your Score", fill="toself"))
-        fig.add_trace(go.Scatterpolar(r=bench_c, theta=topics_c, name=sector, fill="toself"))
-        fig.update_layout(polar=dict(radialaxis=dict(range=[0, 100])), showlegend=True)
-        st.plotly_chart(fig)
-
+        matrix(user_cat_means, sector, bench_cat_means)
+        radar_graph(topic_scores, sector, bench_topic)
     else:
-        result_df = pd.DataFrame({
-            "Your Score": {cat: f"{v}%" for cat, v in user_cat_means.items()},
-        })
-        st.table(result_df)
+        matrix(user_cat_means, sector)
+        radar_graph(topic_scores, sector)
 
     if st.button("Start over"):
         st.session_state.sector = None

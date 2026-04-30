@@ -50,6 +50,24 @@ def radar_graph(topic_scores, sector, bench_topic=None):
     fig.update_layout(polar=dict(radialaxis=dict(range=[0, 100])), showlegend=True)
     st.plotly_chart(fig)
 
+def save_to_csv(company, sector, is_other, answers, total):
+    row = {
+        "date": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "company": company,
+        "sector": sector,
+        "sector_is_other": is_other,
+    }
+    for i in range(total):
+        row[f"answer{i + 1}"] = answers.get(i)
+
+    df_row = pd.DataFrame([row])
+    filepath = "responses.csv"
+
+    if os.path.exists(filepath):
+        df_row.to_csv(filepath, mode="a", header=False, index=False)
+    else:
+        df_row.to_csv(filepath, mode="w", header=True, index=False)
+
 
 def main():
     st.title("Marketing Maturity Benchmark")
@@ -107,7 +125,16 @@ def main():
             if st.button("Next" if i < total - 1 else "Submit", disabled=chosen is None):
                 st.session_state.answers[i] = int(chosen[0])
                 st.session_state.current += 1
+                if i == total - 1:
+                    save_to_csv(
+                        st.session_state.company,
+                        st.session_state.sector,
+                        st.session_state.sector_other,
+                        st.session_state.answers,
+                        total,
+                    )
                 st.rerun()
+
         return
 
     # Étape 3 — résultats

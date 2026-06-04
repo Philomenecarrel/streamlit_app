@@ -1,23 +1,11 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import os
+
 from datetime import datetime
 from dotenv import load_dotenv
-from mistralai.client import Mistral
 
-load_dotenv()
 
-def get_mistral_api_key():
-    return st.secrets.get("MISTRAL_API_KEY") or os.getenv("MISTRAL_API_KEY")
-
-api_key = get_mistral_api_key()
-if not api_key:
-    raise RuntimeError(
-        "Missing MISTRAL_API_KEY: set it in Streamlit secrets or in your environment (.env)."
-    )
-
-client = Mistral(api_key=api_key)
 
 @st.cache_data
 def load_questions():
@@ -92,45 +80,6 @@ def save_to_csv(company, sector, is_other, answers, total):
         df_row.to_csv(filepath, mode="a", header=False, index=False)
     else:
         df_row.to_csv(filepath, mode="w", header=True, index=False)
-
-@st.cache_data
-def build_insight_prompt(topic_scores, bench_topic, sector, topic_to_cat):
-    lines = []
-    for topic, score in topic_scores.items():
-        cat = topic_to_cat.get(topic, "")
-        if bench_topic:
-            bench = bench_topic.get(topic, None)
-            gap = f", gap vs benchmark = {round(score - bench):+}%" if bench is not None else ""
-            lines.append(f"- [{cat}] {topic}: {round(score)}%{gap} (benchmark: {round(bench)}%)")
-        else:
-            lines.append(f"- [{cat}] {topic}: {round(score)}%")
-
-    scores_text = "\n".join(lines)
-
-    benchmark_instruction = (
-        f"The scores are compared to the {sector} sector benchmark."
-        if bench_topic
-        else "No sector benchmark is available."
-    )
-
-    return f"""You are a marketing strategy consultant. A company has completed a marketing maturity assessment.
-
-{benchmark_instruction} Here are their scores by topic (grouped by category):
-
-{scores_text}
-
-Write 3 strategic insights for this company. Each insight should focus on a specific topic or a coherent group of topics where one of the following situations stands out:
-- a strong gap (positive or negative) between the company and the benchmark
-- a notably low score, especially if consistent across topics in the same category
-- a notable strength, especially if consistent across topics in the same category
-
-Guidelines:
-- Do not structure the insights as a fixed template (no "Strength / Gap / Recommendation" pattern)
-- Write each insight as a short natural paragraph (3 sentences max)
-- Be specific: name the topics, quote the scores, reference the benchmark when relevant
-- Prioritize the most striking or actionable findings
-- Use a professional but accessible tone, in English
-- Do not be dramatic or use superlatives. Be factual and constructive."""
 
 def main():
     st.title("Marketing Maturity Benchmark")
@@ -236,13 +185,6 @@ def main():
         st.session_state.answers = {}
         st.rerun()
 
-    prompt = build_insight_prompt(topic_scores, bench_topic, sector, topic_to_cat)
-
-    response = client.chat.complete(
-        model="mistral-large-latest",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    st.markdown(response.choices[0].message.content)
 
 
 if __name__ == "__main__":

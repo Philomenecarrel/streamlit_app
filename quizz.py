@@ -4,12 +4,41 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-from mistralai import Mistral
-import os
 
 load_dotenv()
 
-client = Mistral(api_key=st.secrets["MISTRAL_API_KEY"])
+# Resolve Mistral client class across different mistralai package layouts
+import importlib
+ClientClass = None
+for path in ("mistralai", "mistralai.client.sdk", "mistralai.sdk", "mistralai.client"):
+    try:
+        mod = importlib.import_module(path)
+    except Exception:
+        continue
+    if hasattr(mod, "Mistral"):
+        ClientClass = getattr(mod, "Mistral")
+        break
+    if hasattr(mod, "MistralClient"):
+        ClientClass = getattr(mod, "MistralClient")
+        break
+
+if ClientClass is None:
+    raise ImportError("Could not find a Mistral client class in the installed 'mistralai' package.")
+
+def get_mistral_api_key():
+    try:
+        key = st.secrets.get("MISTRAL_API_KEY")
+    except Exception:
+        key = None
+    return key or os.getenv("MISTRAL_API_KEY")
+
+api_key = get_mistral_api_key()
+if not api_key:
+    raise RuntimeError(
+        "Missing MISTRAL_API_KEY: set it in Streamlit secrets or in your environment (.env)."
+    )
+
+client = ClientClass(api_key=api_key)
 
 @st.cache_data
 def load_questions():

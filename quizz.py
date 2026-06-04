@@ -9,7 +9,7 @@ import os
 
 load_dotenv()
 
-client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+client = Mistral(api_key=st.secrets["MISTRAL_API_KEY"])
 
 @st.cache_data
 def load_questions():

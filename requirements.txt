@@ -4,3 +4,4 @@ plotly
 google-generativeai
 python-dotenv
 mistralai
+gspread

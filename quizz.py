@@ -4,7 +4,9 @@ import plotly.graph_objects as go
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-
+import gspread
+import json
+from google.oauth2.service_account import Credentials
 load_dotenv()
 
 # Resolve Mistral client class across different mistralai package layouts
@@ -39,6 +41,39 @@ if not api_key:
     )
 
 client = ClientClass(api_key=api_key)
+
+@st.cache_resource
+def get_google_sheet():
+    try:
+        # Essayer Streamlit Secrets en priorité (Cloud)
+        try:
+            creds_dict = st.secrets.get("gcp_service_account")
+        except Exception:
+            creds_dict = None
+        
+        # Fallback: lire le .env (local)
+        if not creds_dict:
+            gcp_json = os.getenv("GCP_SERVICE_ACCOUNT")
+            if gcp_json:
+                creds_dict = json.loads(gcp_json)
+        
+        if creds_dict:
+            creds = Credentials.from_service_account_info(
+                creds_dict,
+                scopes=["https://www.googleapis.com/auth/spreadsheets"]
+            )
+            gc = gspread.authorize(creds)
+            try:
+                sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
+            except Exception:
+                sheet_id = os.getenv("GOOGLE_SHEET_ID")
+            
+            if sheet_id:
+                return gc.open_by_key(sheet_id).sheet1
+    except Exception as e:
+        print(f"Debug: get_google_sheet failed: {e}")
+        pass
+    return None
 
 @st.cache_data
 def load_questions():
@@ -107,8 +142,19 @@ def save_to_csv(company, sector, is_other, answers, total):
         row[f"answer{i + 1}"] = answers.get(i)
 
     df_row = pd.DataFrame([row])
+    
+    sheet = get_google_sheet()
+    
+    if sheet:
+        try:
+            row_list = [row.get("date"), row.get("company"), row.get("sector"), row.get("sector_is_other")]
+            for i in range(total):
+                row_list.append(row.get(f"answer{i + 1}"))
+            sheet.append_row(row_list)
+            return
+        except Exception as e:
+            st.warning(f"Google Sheets save failed: {e}")
     filepath = "responses.csv"
-
     if os.path.exists(filepath):
         df_row.to_csv(filepath, mode="a", header=False, index=False)
     else:

@@ -313,4 +313,21 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if st.sidebar.checkbox("Debug Google Sheets"):
+        try:
+            creds_dict = st.secrets.get("gcp_service_account")
+            st.write("✅ Credentials trouvés:", creds_dict is not None)
+        
+            sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
+            st.write(f"✅ Sheet ID: {sheet_id}")
+        
+            sheet = get_google_sheet()
+            st.write(f"✅ Sheet connectée: {sheet is not None}")
+        
+            if sheet:
+                st.write("✅ Sheet accessible! Premières lignes:")
+                st.write(sheet.get_all_records()[:5])
+        except Exception as e:
+            st.error(f"❌ Erreur: {e}")
+    else:
+        main()

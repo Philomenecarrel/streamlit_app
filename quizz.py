@@ -45,35 +45,42 @@ client = ClientClass(api_key=api_key)
 @st.cache_resource
 def get_google_sheet():
     try:
-        # Essayer Streamlit Secrets en priorité (Cloud)
         try:
             creds_dict = st.secrets.get("gcp_service_account")
         except Exception:
             creds_dict = None
         
-        # Fallback: lire le .env (local)
         if not creds_dict:
+            import json
             gcp_json = os.getenv("GCP_SERVICE_ACCOUNT")
             if gcp_json:
-                creds_dict = json.loads(gcp_json)
+                try:
+                    creds_dict = json.loads(gcp_json)
+                except Exception:
+                    creds_dict = None
         
-        if creds_dict:
-            creds = Credentials.from_service_account_info(
-                creds_dict,
-                scopes=["https://www.googleapis.com/auth/spreadsheets"]
-            )
-            gc = gspread.authorize(creds)
-            try:
-                sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
-            except Exception:
-                sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        if not creds_dict:
+            return None
             
-            if sheet_id:
-                return gc.open_by_key(sheet_id).sheet1
+        creds = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        gc = gspread.authorize(creds)
+        try:
+            sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
+        except Exception:
+            sheet_id = os.getenv("GOOGLE_SHEET_ID")
+        
+        if not sheet_id:
+            return None
+            
+        workbook = gc.open_by_key(sheet_id)
+        return workbook.sheet1
+        
     except Exception as e:
-        print(f"Debug: get_google_sheet failed: {e}")
-        pass
-    return None
+        print(f"❌ Erreur get_google_sheet: {e}")
+        return None
 
 @st.cache_data
 def load_questions():

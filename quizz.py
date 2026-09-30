@@ -310,8 +310,6 @@ def main():
         messages=[{"role": "user", "content": prompt}]
     )
     st.markdown(response.choices[0].message.content)
-
-
 if __name__ == "__main__":
     if st.sidebar.checkbox("Debug Google Sheets"):
         try:
@@ -321,12 +319,28 @@ if __name__ == "__main__":
             sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
             st.write(f"✅ Sheet ID: {sheet_id}")
         
-            sheet = get_google_sheet()
-            st.write(f"✅ Sheet connectée: {sheet is not None}")
-        
-            if sheet:
-                st.write("✅ Sheet accessible! Premières lignes:")
+            # Debug détaillé
+            st.write("\n🔍 Tentative connexion...")
+            try:
+                from google.oauth2.service_account import Credentials
+                creds = Credentials.from_service_account_info(
+                    creds_dict,
+                    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+                )
+                st.write("✅ Credentials créés")
+                
+                gc = gspread.authorize(creds)
+                st.write("✅ Gspread autorisé")
+                
+                workbook = gc.open_by_key(sheet_id)
+                st.write("✅ Workbook ouvert")
+                
+                sheet = workbook.sheet1
+                st.write("✅ Sheet connectée!")
                 st.write(sheet.get_all_records()[:5])
+                
+            except Exception as e:
+                st.error(f"❌ Erreur détaillée: {type(e).__name__}: {e}")
         except Exception as e:
             st.error(f"❌ Erreur: {e}")
     else:

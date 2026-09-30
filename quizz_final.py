@@ -63,8 +63,6 @@ def get_google_sheet():
                 scopes=["https://www.googleapis.com/auth/spreadsheets"]
             )
             gc = gspread.authorize(creds)
-            
-            # Essayer Streamlit Secrets en priorité, fallback sur .env
             try:
                 sheet_id = st.secrets.get("GOOGLE_SHEET_ID")
             except Exception:
@@ -145,33 +143,22 @@ def save_to_csv(company, sector, is_other, answers, total):
 
     df_row = pd.DataFrame([row])
     
-    # Essayer Google Sheets en priorité
-    print("🔍 Tentative sauvegarde Google Sheets...")
     sheet = get_google_sheet()
     
     if sheet:
-        print("✅ Sheet trouvée, ajout de la ligne...")
         try:
             row_list = [row.get("date"), row.get("company"), row.get("sector"), row.get("sector_is_other")]
             for i in range(total):
                 row_list.append(row.get(f"answer{i + 1}"))
             sheet.append_row(row_list)
-            print("✅ Données sauvegardées dans Google Sheets!")
             return
         except Exception as e:
-            print(f"❌ Erreur Google Sheets: {e}")
             st.warning(f"Google Sheets save failed: {e}")
-    else:
-        print("❌ Sheet pas trouvée (secrets pas configurés?)")
-    
-    # Fallback : sauvegarder en CSV local
-    print("📁 Fallback: Sauvegarde en CSV local...")
     filepath = "responses.csv"
     if os.path.exists(filepath):
         df_row.to_csv(filepath, mode="a", header=False, index=False)
     else:
         df_row.to_csv(filepath, mode="w", header=True, index=False)
-    print("✅ CSV sauvegardé!")
 
 @st.cache_data
 def build_insight_prompt(topic_scores, bench_topic, sector, topic_to_cat):
@@ -327,3 +314,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

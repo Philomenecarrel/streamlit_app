@@ -7,25 +7,8 @@ from dotenv import load_dotenv
 import gspread
 import json
 from google.oauth2.service_account import Credentials
+from urllib.request import Request, urlopen
 load_dotenv()
-
-# Resolve Mistral client class across different mistralai package layouts
-import importlib
-ClientClass = None
-for path in ("mistralai", "mistralai.client.sdk", "mistralai.sdk", "mistralai.client"):
-    try:
-        mod = importlib.import_module(path)
-    except Exception:
-        continue
-    if hasattr(mod, "Mistral"):
-        ClientClass = getattr(mod, "Mistral")
-        break
-    if hasattr(mod, "MistralClient"):
-        ClientClass = getattr(mod, "MistralClient")
-        break
-
-if ClientClass is None:
-    raise ImportError("Could not find a Mistral client class in the installed 'mistralai' package.")
 
 def get_mistral_api_key():
     try:
@@ -40,7 +23,43 @@ if not api_key:
         "Missing MISTRAL_API_KEY: set it in Streamlit secrets or in your environment (.env)."
     )
 
-client = ClientClass(api_key=api_key)
+def complete_mistral(prompt):
+    request = Request(
+        "https://api.mistral.ai/v1/chat/completions",
+        data=json.dumps({
+            "model": "mistral-small-2603",
+            "messages": [{"role": "user", "content": prompt}],
+        }).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=60) as response:
+        payload = json.loads(response.read())
+
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except (IndexError, KeyError, TypeError) as exc:
+        raise RuntimeError("Unexpected response format from Mistral.") from exc
+
+    if isinstance(content, str):
+        answer = content
+    elif isinstance(content, list):
+        answer = "\n".join(
+            chunk["text"]
+            for chunk in content
+            if isinstance(chunk, dict)
+            and chunk.get("type") == "text"
+            and isinstance(chunk.get("text"), str)
+        )
+    else:
+        answer = ""
+
+    if not answer.strip():
+        raise RuntimeError("Mistral response did not contain any text.")
+    return answer
 
 @st.cache_resource
 def get_google_sheet():
@@ -311,12 +330,6 @@ def main():
         st.rerun()
 
     prompt = build_insight_prompt(topic_scores, bench_topic, sector, topic_to_cat)
-
-    response = client.chat.complete(
-        model="mistral-large-latest",
-        messages=[{"role": "user", "content": prompt}]
-    )
-        
-    st.markdown(response.choices[0].message.content)
+    st.markdown(complete_mistral(prompt))
 if __name__ == "__main__":
     main()

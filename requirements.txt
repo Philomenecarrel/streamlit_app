@@ -3,5 +3,5 @@ pandas
 plotly
 google-generativeai
 python-dotenv
-mistralai
+mistralai==3.9.0
 gspread

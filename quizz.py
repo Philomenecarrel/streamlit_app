@@ -1,5 +1,3 @@
-from urllib import response
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -9,7 +7,6 @@ from dotenv import load_dotenv
 import gspread
 import json
 from google.oauth2.service_account import Credentials
-from mistralai.models import TextChunk
 load_dotenv()
 
 # Resolve Mistral client class across different mistralai package layouts
@@ -319,20 +316,7 @@ def main():
         model="mistral-large-latest",
         messages=[{"role": "user", "content": prompt}]
     )
-
-    content = response.choices[0].message.content
-    if isinstance(content, str):
-        answer = content
-    elif isinstance(content, list):
-        answer = "\n".join(
-            chunk.text for chunk in content if isinstance(chunk, TextChunk)
-        )
-    else:
-        answer = ""
-
-    if answer.strip():
-        st.markdown(answer)
-    else:
-        st.error("No returned answer.")
+        
+    st.markdown(response.choices[0].message.content)
 if __name__ == "__main__":
     main()

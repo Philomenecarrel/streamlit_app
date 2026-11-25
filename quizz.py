@@ -1,3 +1,5 @@
+from urllib import response
+
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -316,6 +318,16 @@ def main():
         model="mistral-large-latest",
         messages=[{"role": "user", "content": prompt}]
     )
-    st.markdown(response.choices[0].message.content)
+ 
+    content = response.choices[0].message.content
+    print("Mistral model:", response.model)
+    print("Content type:", type(content).__name__)
+    print(
+    "Chunk types:",
+    [type(chunk).__name__ for chunk in content] if isinstance(content, list) else "-"
+)
+
+    st.markdown(content)
+
 if __name__ == "__main__":
     main()

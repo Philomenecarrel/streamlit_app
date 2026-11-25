@@ -27,7 +27,8 @@ def complete_mistral(prompt):
     request = Request(
         "https://api.mistral.ai/v1/chat/completions",
         data=json.dumps({
-            "model": "mistral-small-2603",
+            "model": "mistral-large-latest",
+            "reasoning_effort": "none",
             "messages": [{"role": "user", "content": prompt}],
         }).encode("utf-8"),
         headers={

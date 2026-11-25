@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 import gspread
 import json
 from google.oauth2.service_account import Credentials
+from mistralai.models import TextChunk
 load_dotenv()
 
 # Resolve Mistral client class across different mistralai package layouts
@@ -318,16 +319,20 @@ def main():
         model="mistral-large-latest",
         messages=[{"role": "user", "content": prompt}]
     )
- 
+
     content = response.choices[0].message.content
-    print("Mistral model:", response.model)
-    print("Content type:", type(content).__name__)
-    print(
-    "Chunk types:",
-    [type(chunk).__name__ for chunk in content] if isinstance(content, list) else "-"
-)
+    if isinstance(content, str):
+        answer = content
+    elif isinstance(content, list):
+        answer = "\n".join(
+            chunk.text for chunk in content if isinstance(chunk, TextChunk)
+        )
+    else:
+        answer = ""
 
-    st.markdown(content)
-
+    if answer.strip():
+        st.markdown(answer)
+    else:
+        st.error("No returned answer.")
 if __name__ == "__main__":
     main()

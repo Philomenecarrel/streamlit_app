@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import gspread
 import json
 from google.oauth2.service_account import Credentials
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 load_dotenv()
 
@@ -27,8 +28,7 @@ def complete_mistral(prompt):
     request = Request(
         "https://api.mistral.ai/v1/chat/completions",
         data=json.dumps({
-            "model": "mistral-large-latest",
-            "reasoning_effort": "none",
+            "model": "mistral-small-2603",
             "messages": [{"role": "user", "content": prompt}],
         }).encode("utf-8"),
         headers={
@@ -37,8 +37,14 @@ def complete_mistral(prompt):
         },
         method="POST",
     )
-    with urlopen(request, timeout=60) as response:
-        payload = json.loads(response.read())
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read())
+    except HTTPError as exc:
+        details = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"Mistral API returned HTTP {exc.code}: {details}"
+        ) from exc
 
     try:
         content = payload["choices"][0]["message"]["content"]
